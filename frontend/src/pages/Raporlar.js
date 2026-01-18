@@ -1,0 +1,897 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import Layout from '@/components/Layout';
+import RaporModal from '@/components/RaporModal';
+import RaporDetailModal from '@/components/RaporDetailModal';
+import ExcelImportModal from '@/components/ExcelImportModal';
+import IskeleBileseniModal from '@/components/IskeleBileseniModal';
+import IskeleBileseniExcelImportModal from '@/components/IskeleBileseniExcelImportModal';
+import FiltrelemePanel from '@/components/FiltrelemePanel';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
+import { Plus, Search, Download, Upload, Eye, Edit, Trash2, FileText, AlertCircle, ArrowUpDown, ChevronLeft, ChevronRight, ChevronDown, Building2, Archive, Loader2, CheckSquare, Square, XSquare } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const API = `${BACKEND_URL}/api`;
+
+const Raporlar = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [raporlar, setRaporlar] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({
+    kategori: '',
+    periyot: '',
+    uygunluk: '',
+    firma: '',
+  });
+  const [sortOrder, setSortOrder] = useState('newest'); // 'newest' or 'oldest'
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
+  
+  const [showRaporModal, setShowRaporModal] = useState(false);
+  const [showIskeleBileseniModal, setShowIskeleBileseniModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showIskeleBileseniExcelModal, setShowIskeleBileseniExcelModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  
+  const [selectedRapor, setSelectedRapor] = useState(null);
+  const [deleteRaporId, setDeleteRaporId] = useState(null);
+  const [selectedRaporlar, setSelectedRaporlar] = useState([]);
+  const [user, setUser] = useState(null);
+  const [zipLoading, setZipLoading] = useState(false);
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
+    
+    // Check if we have filtered reports from Dashboard
+    if (location.state?.filteredReports) {
+      setRaporlar(location.state.filteredReports);
+      setLoading(false);
+      toast.success(`${location.state.filterType}: ${location.state.filteredReports.length} rapor`);
+    } else if (location.state?.filterProjeId) {
+      fetchRaporlarByProje(location.state.filterProjeId);
+    } else {
+      fetchRaporlar();
+    }
+  }, []);
+
+  // Separate useEffect for handling FAB button click (openNewRaporModal)
+  useEffect(() => {
+    if (location.state?.openNewRaporModal) {
+      setShowRaporModal(true);
+      // Clear the state to prevent modal reopening on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state?.openNewRaporModal]);
+
+  const fetchRaporlar = async (customFilters = {}, retryCount = 0) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+      
+      const params = new URLSearchParams();
+      
+      if (searchTerm) params.append('arama', searchTerm);
+      if (customFilters.kategori || filters.kategori) params.append('kategori', customFilters.kategori || filters.kategori);
+      if (customFilters.periyot || filters.periyot) params.append('periyot', customFilters.periyot || filters.periyot);
+      if (customFilters.uygunluk || filters.uygunluk) params.append('uygunluk', customFilters.uygunluk || filters.uygunluk);
+      if (customFilters.firma || filters.firma) params.append('firma', customFilters.firma || filters.firma);
+      
+      // Add limit for better performance
+      params.append('limit', '500');
+      
+      const response = await axios.get(`${API}/raporlar?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 10000, // 10 second timeout
+      });
+      setRaporlar(response.data);
+    } catch (error) {
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+      } else if (retryCount < 2) {
+        setTimeout(() => fetchRaporlar(customFilters, retryCount + 1), 1000);
+      } else {
+        toast.error('Raporlar yüklenemedi. Lütfen sayfayı yenileyin.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = () => {
+    setCurrentPage(1);
+    fetchRaporlar();
+  };
+
+  const handleFilterChange = (newFilters) => {
+    setCurrentPage(1);
+    setFilters(newFilters);
+    fetchRaporlar(newFilters);
+  };
+
+  const handleCreateRapor = () => {
+    setSelectedRapor(null);
+    setShowRaporModal(true);
+  };
+
+  const handleEditRapor = (rapor) => {
+    setSelectedRapor(rapor);
+    setShowRaporModal(true);
+  };
+
+  const handleViewRapor = (rapor) => {
+    setSelectedRapor(rapor);
+    setShowDetailModal(true);
+  };
+
+  const handleDeleteClick = (raporId) => {
+    setDeleteRaporId(raporId);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${API}/raporlar/${deleteRaporId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success('Rapor silindi');
+      fetchRaporlar();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Rapor silinemedi');
+    } finally {
+      setShowDeleteDialog(false);
+      setDeleteRaporId(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedRaporlar.length === 0) {
+      toast.error('Lütfen silmek için en az bir rapor seçin');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`${API}/raporlar/bulk-delete`, selectedRaporlar, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success(response.data.message);
+      setSelectedRaporlar([]);
+      fetchRaporlar();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Toplu silme işlemi başarısız');
+    }
+  };
+
+  const handleZipDownload = async () => {
+    if (selectedRaporlar.length === 0) {
+      toast.error('Lütfen indirmek için en az bir rapor seçin');
+      return;
+    }
+
+    if (selectedRaporlar.length > 100) {
+      toast.error('En fazla 100 rapor seçilebilir');
+      return;
+    }
+
+    setZipLoading(true);
+    const loadingToast = toast.loading(`${selectedRaporlar.length} rapor hazırlanıyor...`);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${API}/raporlar/zip-export`,
+        { rapor_ids: selectedRaporlar },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          responseType: 'blob',
+          timeout: 120000, // 2 dakika timeout (büyük dosyalar için)
+        }
+      );
+      
+      // Dosya adını response header'dan al veya varsayılan kullan
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `Raporlar_${new Date().toISOString().slice(0,10).replace(/-/g,'')}_${new Date().toTimeString().slice(0,5).replace(':','')}.zip`;
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+      
+      // Blob'u indir
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.dismiss(loadingToast);
+      toast.success(`${selectedRaporlar.length} rapor başarıyla indirildi`);
+      
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      if (error.code === 'ECONNABORTED') {
+        toast.error('İndirme zaman aşımına uğradı. Daha az rapor seçmeyi deneyin.');
+      } else {
+        toast.error(error.response?.data?.detail || 'ZIP indirme başarısız oldu');
+      }
+    } finally {
+      setZipLoading(false);
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedRaporlar([]);
+    toast.info('Seçim temizlendi');
+  };
+
+  const handleSelectAll = useCallback(() => {
+    if (selectedRaporlar.length === raporlar.length) {
+      setSelectedRaporlar([]);
+    } else {
+      setSelectedRaporlar(raporlar.map(r => r.id));
+    }
+  }, [selectedRaporlar.length, raporlar]);
+
+  const handleToggleSelect = (raporId) => {
+    setSelectedRaporlar(prev => 
+      prev.includes(raporId) ? prev.filter(id => id !== raporId) : [...prev, raporId]
+    );
+  };
+
+  const fetchRaporlarByProje = async (projeId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API}/raporlar`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      const filtered = response.data.filter(r => r.proje_id === projeId);
+      setRaporlar(filtered);
+      setLoading(false);
+      
+      if (filtered.length > 0) {
+        toast.success(`Proje raporları: ${filtered.length} rapor bulundu`);
+      } else {
+        toast.info('Bu proje için henüz rapor oluşturulmamış');
+      }
+    } catch (error) {
+      toast.error('Raporlar yüklenemedi');
+      setLoading(false);
+    }
+  };
+
+  const handleToggleDurum = async (raporId, currentDurum) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Optimistic update
+      setRaporlar(prev => prev.map(r => 
+        r.id === raporId 
+          ? { ...r, durum: currentDurum === 'Aktif' ? 'Pasif' : 'Aktif' }
+          : r
+      ));
+      
+      const response = await axios.patch(`${API}/raporlar/${raporId}/durum`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      toast.success(response.data.message);
+    } catch (error) {
+      // Revert on error
+      setRaporlar(prev => prev.map(r => 
+        r.id === raporId 
+          ? { ...r, durum: currentDurum }
+          : r
+      ));
+      toast.error(error.response?.data?.detail || 'Durum güncellenemedi');
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API}/excel/export`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob',
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `raporlar_${new Date().toISOString().split('T')[0]}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      toast.success('Excel dosyası indirildi');
+    } catch (error) {
+      toast.error('Excel export başarısız');
+    }
+  };
+
+  const canEdit = user?.role === 'admin' || user?.role === 'inspector';
+
+  // Sort reports based on sortOrder
+  const sortedRaporlar = useMemo(() => {
+    const sorted = [...raporlar];
+    sorted.sort((a, b) => {
+      const dateA = new Date(a.created_at || a.tarih || 0);
+      const dateB = new Date(b.created_at || b.tarih || 0);
+      
+      if (sortOrder === 'newest') {
+        return dateB - dateA; // Yeniden eskiye
+      } else {
+        return dateA - dateB; // Eskiden yeniye
+      }
+    });
+    return sorted;
+  }, [raporlar, sortOrder]);
+
+  // Paginate sorted reports
+  const paginatedRaporlar = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return sortedRaporlar.slice(startIndex, endIndex);
+  }, [sortedRaporlar, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(sortedRaporlar.length / itemsPerPage);
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <div className="space-y-6 animate-fade-in">
+        {/* Header */}
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <Checkbox
+              checked={selectedRaporlar.length === raporlar.length && raporlar.length > 0}
+              onCheckedChange={handleSelectAll}
+            />
+            <div className="flex-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">Raporlar</h1>
+              <p className="text-sm sm:text-base text-gray-600">
+                {raporlar.length} rapor bulundu 
+                {selectedRaporlar.length > 0 && ` (${selectedRaporlar.length} seçili)`}
+              </p>
+            </div>
+          </div>
+
+          {/* Toplu İşlemler Bölümü */}
+          {selectedRaporlar.length > 0 && (
+            <Card className="border-blue-200 bg-blue-50/50">
+              <CardContent className="py-3 px-3 sm:px-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <CheckSquare className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                    <span className="font-medium text-blue-800 text-sm sm:text-base">
+                      {selectedRaporlar.length} rapor seçildi
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Tümünü Seç / Seçimi Temizle */}
+                    {selectedRaporlar.length < raporlar.length ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSelectAll}
+                        className="border-blue-600 text-blue-700 hover:bg-blue-100 flex-1 sm:flex-none h-10"
+                      >
+                        <Square className="h-4 w-4 mr-1 sm:mr-2" />
+                        <span className="hidden xs:inline">Tümünü Seç</span>
+                        <span className="xs:hidden">Tümü</span>
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleClearSelection}
+                        className="border-gray-400 text-gray-600 hover:bg-gray-100 flex-1 sm:flex-none h-10"
+                      >
+                        <XSquare className="h-4 w-4 mr-1 sm:mr-2" />
+                        <span className="hidden xs:inline">Seçimi Temizle</span>
+                        <span className="xs:hidden">Temizle</span>
+                      </Button>
+                    )}
+                    
+                    {/* ZIP İndir Butonu */}
+                    <Button
+                      onClick={handleZipDownload}
+                      disabled={zipLoading}
+                      className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white flex-1 sm:flex-none h-10"
+                      data-testid="zip-download-button"
+                    >
+                      {zipLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 sm:mr-2 animate-spin" />
+                          <span className="hidden sm:inline">İşleniyor...</span>
+                          <span className="sm:hidden">...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Archive className="h-4 w-4 mr-1 sm:mr-2" />
+                          <span className="hidden sm:inline">ZIP İndir</span>
+                          <span className="sm:hidden">ZIP</span>
+                        </>
+                      )}
+                    </Button>
+                    
+                    {/* Toplu Sil Butonu */}
+                    {canEdit && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleBulkDelete}
+                        className="flex-1 sm:flex-none h-10"
+                        data-testid="bulk-delete-reports-button"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1 sm:mr-2" />
+                        <span className="hidden sm:inline">Sil</span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {canEdit && (
+              <>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      className="bg-gradient-to-r from-blue-700 to-blue-600 hover:from-blue-800 hover:to-blue-700 text-white shadow-sm"
+                      data-testid="new-report-button"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Yeni Rapor
+                      <ChevronDown className="h-4 w-4 ml-2" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem
+                      onClick={() => setShowRaporModal(true)}
+                      className="cursor-pointer"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Normal Rapor Oluştur
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setShowIskeleBileseniModal(true)}
+                      className="cursor-pointer"
+                    >
+                      <Building2 className="h-4 w-4 mr-2" />
+                      İskele Bileşeni Ekle
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="border-blue-600 text-blue-700 hover:bg-blue-50"
+                      data-testid="import-excel-button"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Excel İçe Aktar
+                      <ChevronDown className="h-4 w-4 ml-2" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem
+                      onClick={() => setShowImportModal(true)}
+                      className="cursor-pointer"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Normal Rapor İçe Aktar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setShowIskeleBileseniExcelModal(true)}
+                      className="cursor-pointer"
+                    >
+                      <Building2 className="h-4 w-4 mr-2" />
+                      İskele Bileşenleri İçe Aktar
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
+            <Button
+              onClick={handleExportExcel}
+              variant="outline"
+              className="border-green-600 text-green-700 hover:bg-green-50 text-sm sm:text-base"
+              data-testid="export-excel-button"
+            >
+              <Download className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Excel </span>İndir
+            </Button>
+            <Button
+              onClick={() => navigate('/iskele-bilesenleri')}
+              variant="outline"
+              className="border-blue-600 text-blue-700 hover:bg-blue-50 text-sm sm:text-base"
+            >
+              <Building2 className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden xs:inline">İskele Bileşenleri</span>
+              <span className="xs:hidden">Bileşenler</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Search and Filter */}
+        <Card className="shadow-md">
+          <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
+            <div className="space-y-3 sm:space-y-4">
+              {/* Search and Sort - Stack on mobile */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Rapor no, ekipman veya firma ara..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    className="pl-10 h-11"
+                    data-testid="search-input"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Select value={sortOrder} onValueChange={setSortOrder}>
+                    <SelectTrigger className="w-full sm:w-[160px] h-11">
+                      <ArrowUpDown className="h-4 w-4 mr-2 flex-shrink-0" />
+                      <SelectValue placeholder="Sıralama" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="newest">Yeniden Eskiye</SelectItem>
+                      <SelectItem value="oldest">Eskiden Yeniye</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={handleSearch} className="h-11 px-4" data-testid="search-button">
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Filters */}
+              <FiltrelemePanel filters={filters} onFilterChange={handleFilterChange} raporlar={raporlar} />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Reports List */}
+        {raporlar.length === 0 ? (
+          <Card className="shadow-md">
+            <CardContent className="py-16">
+              <div className="text-center text-gray-500">
+                <FileText className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                <p className="text-lg font-medium mb-2">Rapor bulunamadı</p>
+                <p className="text-sm">Yeni bir rapor oluşturarak başlayabilirsiniz</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-3 sm:gap-4">
+              {paginatedRaporlar.map((rapor) => (
+                <Card key={rapor.id} className="card-hover shadow-md overflow-hidden" data-testid={`report-card-${rapor.id}`}>
+                <CardContent className="p-3 sm:p-4 md:p-6">
+                  <div className="flex gap-2 sm:gap-3">
+                    <Checkbox
+                      checked={selectedRaporlar.includes(rapor.id)}
+                      onCheckedChange={() => handleToggleSelect(rapor.id)}
+                      className="mt-1 flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      {/* Mobile-first header */}
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-800 truncate">{rapor.ekipman_adi}</h3>
+                          <div className="flex items-center gap-2 flex-wrap mt-1">
+                            <p className="text-xs sm:text-sm text-gray-500 font-medium">{rapor.rapor_no}</p>
+                            {rapor.created_by_username && (
+                              <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded truncate max-w-[100px] sm:max-w-none">
+                                {rapor.created_by_username}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {/* Status badges - row on mobile */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {canEdit && (
+                            <Button
+                              onClick={() => handleToggleDurum(rapor.id, rapor.durum || 'Aktif')}
+                              size="sm"
+                              className={`
+                                ${(rapor.durum || 'Aktif') === 'Aktif' 
+                                  ? 'bg-green-600 hover:bg-green-700 text-white' 
+                                  : 'bg-gray-400 hover:bg-gray-500 text-white'
+                                }
+                                text-xs px-2 py-1 h-7 sm:h-8
+                              `}
+                              data-testid={`toggle-status-${rapor.id}`}
+                            >
+                              {(rapor.durum || 'Aktif') === 'Aktif' ? '✓ Aktif' : '⏸ Pasif'}
+                            </Button>
+                          )}
+                          {rapor.uygunluk && (
+                            <span
+                              className={`${rapor.uygunluk === 'Uygun' ? 'badge-success' : 'badge-danger'} text-xs px-2 py-1`}
+                              data-testid={`uygunluk-badge-${rapor.id}`}
+                            >
+                              {rapor.uygunluk}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Info Grid - 2 cols on mobile, 3 on larger */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-1.5 text-xs sm:text-sm mb-3">
+                        <div className="truncate">
+                          <span className="text-gray-500">Kategori: </span>
+                          <span className="font-medium text-gray-800">{rapor.kategori}</span>
+                        </div>
+                        <div className="truncate">
+                          <span className="text-gray-500">Firma: </span>
+                          <span className="font-medium text-gray-800">{rapor.firma}</span>
+                        </div>
+                        {rapor.lokasyon && (
+                          <div className="truncate">
+                            <span className="text-gray-500">Lokasyon: </span>
+                            <span className="font-medium text-gray-800">{rapor.lokasyon}</span>
+                          </div>
+                        )}
+                        {rapor.periyot && (
+                          <div className="truncate">
+                            <span className="text-gray-500">Periyot: </span>
+                            <span className="font-medium text-gray-800">{rapor.periyot}</span>
+                          </div>
+                        )}
+                        {rapor.gecerlilik_tarihi && (
+                          <div className="truncate">
+                            <span className="text-gray-500">Geçerlilik: </span>
+                            <span className="font-medium text-gray-800">{rapor.gecerlilik_tarihi}</span>
+                          </div>
+                        )}
+                        {rapor.marka_model && (
+                          <div className="truncate">
+                            <span className="text-gray-500">Marka: </span>
+                            <span className="font-medium text-gray-800">{rapor.marka_model}</span>
+                          </div>
+                        )}
+                      </div>
+                    
+                      {/* Actions - Horizontal on mobile, stacked on larger screens */}
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                        <Button
+                          onClick={() => handleViewRapor(rapor)}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 sm:flex-none h-9"
+                          data-testid={`view-report-${rapor.id}`}
+                        >
+                          <Eye className="h-4 w-4 mr-1 sm:mr-2" />
+                          <span className="hidden xs:inline">Görüntüle</span>
+                          <span className="xs:hidden">Göster</span>
+                        </Button>
+                        {canEdit && (
+                          <>
+                            <Button
+                              onClick={() => handleEditRapor(rapor)}
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 sm:flex-none h-9 border-blue-600 text-blue-700 hover:bg-blue-50"
+                              data-testid={`edit-report-${rapor.id}`}
+                            >
+                              <Edit className="h-4 w-4 mr-1 sm:mr-2" />
+                              <span className="hidden xs:inline">Düzenle</span>
+                              <span className="xs:hidden">Düzen</span>
+                            </Button>
+                            <Button
+                              onClick={() => handleDeleteClick(rapor.id)}
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 sm:flex-none h-9 border-red-600 text-red-700 hover:bg-red-50"
+                              data-testid={`delete-report-${rapor.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1 sm:mr-2" />
+                              Sil
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Pagination - Mobile friendly */}
+          {totalPages > 1 && (
+            <Card className="shadow-md mt-4 sm:mt-6">
+              <CardContent className="py-3 px-3 sm:py-4 sm:px-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
+                    <span className="font-medium">{currentPage}/{totalPages}</span>
+                    <span className="text-gray-400 ml-1">
+                      ({((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, sortedRaporlar.length)} / {sortedRaporlar.length})
+                    </span>
+                  </div>
+                  <div className="flex gap-2 justify-center">
+                    <Button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      variant="outline"
+                      size="sm"
+                      className="h-10 px-3 sm:px-4"
+                    >
+                      <ChevronLeft className="h-4 w-4 sm:mr-1" />
+                      <span className="hidden sm:inline">Önceki</span>
+                    </Button>
+                    <Button
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      variant="outline"
+                      size="sm"
+                      className="h-10 px-3 sm:px-4"
+                    >
+                      <span className="hidden sm:inline">Sonraki</span>
+                      <ChevronRight className="h-4 w-4 sm:ml-1" />
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          </>
+        )}
+      </div>
+
+      {/* Modals */}
+      {showRaporModal && (
+        <RaporModal
+          open={showRaporModal}
+          onClose={() => {
+            setShowRaporModal(false);
+            setSelectedRapor(null);
+          }}
+          rapor={selectedRapor}
+          onSuccess={fetchRaporlar}
+        />
+      )}
+
+      {showDetailModal && (
+        <RaporDetailModal
+          open={showDetailModal}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedRapor(null);
+          }}
+          rapor={selectedRapor}
+        />
+      )}
+
+      {showImportModal && (
+        <ExcelImportModal
+          open={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={fetchRaporlar}
+        />
+      )}
+
+      {showIskeleBileseniExcelModal && (
+        <IskeleBileseniExcelImportModal
+          open={showIskeleBileseniExcelModal}
+          onClose={() => setShowIskeleBileseniExcelModal(false)}
+          onSuccess={fetchRaporlar}
+        />
+      )}
+
+      {showIskeleBileseniModal && (
+        <IskeleBileseniModal
+          open={showIskeleBileseniModal}
+          onClose={() => setShowIskeleBileseniModal(false)}
+          onSuccess={fetchRaporlar}
+        />
+      )}
+
+      {/* İskele Bileşeni Modal */}
+      <IskeleBileseniModal
+        open={showIskeleBileseniModal}
+        onClose={() => setShowIskeleBileseniModal(false)}
+        onSuccess={fetchRaporlar}
+      />
+
+      {/* İskele Bileşeni Excel Import Modal */}
+      <IskeleBileseniExcelImportModal
+        open={showIskeleBileseniExcelModal}
+        onClose={() => setShowIskeleBileseniExcelModal(false)}
+        onSuccess={fetchRaporlar}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              Raporu Sil
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Bu raporu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve rapora ait tüm dosyalar da silinecektir.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="cancel-delete-button">İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="confirm-delete-button"
+            >
+              Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Layout>
+  );
+};
+
+export default Raporlar;

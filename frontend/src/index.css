@@ -1,0 +1,208 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    margin: 0;
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+        "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+        sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+    font-family:
+        source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+@layer base {
+    :root {
+        --background: 0 0% 100%;
+        --foreground: 0 0% 3.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 0 0% 3.9%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 0 0% 3.9%;
+        --primary: 0 0% 9%;
+        --primary-foreground: 0 0% 98%;
+        --secondary: 0 0% 96.1%;
+        --secondary-foreground: 0 0% 9%;
+        --muted: 0 0% 96.1%;
+        --muted-foreground: 0 0% 45.1%;
+        --accent: 0 0% 96.1%;
+        --accent-foreground: 0 0% 9%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 0 0% 89.8%;
+        --input: 0 0% 89.8%;
+        --ring: 0 0% 3.9%;
+        --chart-1: 12 76% 61%;
+        --chart-2: 173 58% 39%;
+        --chart-3: 197 37% 24%;
+        --chart-4: 43 74% 66%;
+        --chart-5: 27 87% 67%;
+        --radius: 0.5rem;
+    }
+    .dark {
+        --background: 0 0% 3.9%;
+        --foreground: 0 0% 98%;
+        --card: 0 0% 3.9%;
+        --card-foreground: 0 0% 98%;
+        --popover: 0 0% 3.9%;
+        --popover-foreground: 0 0% 98%;
+        --primary: 0 0% 98%;
+        --primary-foreground: 0 0% 9%;
+        --secondary: 0 0% 14.9%;
+        --secondary-foreground: 0 0% 98%;
+        --muted: 0 0% 14.9%;
+        --muted-foreground: 0 0% 63.9%;
+        --accent: 0 0% 14.9%;
+        --accent-foreground: 0 0% 98%;
+        --destructive: 0 62.8% 30.6%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 0 0% 14.9%;
+        --input: 0 0% 14.9%;
+        --ring: 0 0% 83.1%;
+        --chart-1: 220 70% 50%;
+        --chart-2: 160 60% 45%;
+        --chart-3: 30 80% 55%;
+        --chart-4: 280 65% 60%;
+        --chart-5: 340 75% 55%;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
+}
+
+@layer base {
+    [data-debug-wrapper="true"] {
+        display: contents !important;
+    }
+
+    [data-debug-wrapper="true"] > * {
+        margin-left: inherit;
+        margin-right: inherit;
+        margin-top: inherit;
+        margin-bottom: inherit;
+        padding-left: inherit;
+        padding-right: inherit;
+        padding-top: inherit;
+        padding-bottom: inherit;
+        column-gap: inherit;
+        row-gap: inherit;
+        gap: inherit;
+        border-left-width: inherit;
+        border-right-width: inherit;
+        border-top-width: inherit;
+        border-bottom-width: inherit;
+        border-left-style: inherit;
+        border-right-style: inherit;
+        border-top-style: inherit;
+        border-bottom-style: inherit;
+        border-left-color: inherit;
+        border-right-color: inherit;
+        border-top-color: inherit;
+        border-bottom-color: inherit;
+    }
+}
+
+/* Mobile Responsive Utilities */
+@layer utilities {
+    /* Touch-friendly button sizes for mobile */
+    .btn-mobile {
+        @apply min-h-[44px] min-w-[44px];
+    }
+    
+    /* Mobile card padding */
+    .card-mobile {
+        @apply p-3 sm:p-4 md:p-6;
+    }
+    
+    /* Mobile text truncation */
+    .text-truncate-mobile {
+        @apply truncate max-w-[150px] sm:max-w-none;
+    }
+    
+    /* Hide scrollbar on mobile but allow scroll */
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+    
+    /* Mobile-friendly badges */
+    .badge-mobile {
+        @apply text-xs px-2 py-1 whitespace-nowrap;
+    }
+    
+    /* Safe area for bottom navigation on mobile */
+    .safe-bottom {
+        padding-bottom: env(safe-area-inset-bottom, 16px);
+    }
+    
+    /* Floating action button */
+    .fab {
+        @apply fixed bottom-6 right-6 z-50 rounded-full shadow-lg;
+        @apply min-h-[56px] min-w-[56px];
+    }
+    
+    /* Animate on mobile touch */
+    .touch-scale {
+        @apply transition-transform active:scale-95;
+    }
+}
+
+/* Mobile-specific responsive styles */
+@media (max-width: 640px) {
+    /* Smaller padding for mobile */
+    .mobile-padding {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+    
+    /* Full width buttons on mobile */
+    .mobile-full-width {
+        width: 100% !important;
+    }
+    
+    /* Reduce font sizes on mobile */
+    .mobile-text-sm {
+        font-size: 0.875rem !important;
+    }
+    
+    /* Stack flex items vertically on mobile */
+    .mobile-stack {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+    
+    /* Dialog/Modal full screen on mobile */
+    [role="dialog"] {
+        max-height: 95vh !important;
+        max-width: 95vw !important;
+        margin: auto !important;
+    }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+    /* Larger touch targets */
+    button, [role="button"], a, input, select, textarea {
+        min-height: 44px;
+    }
+    
+    /* Remove hover states that look bad on touch */
+    .card-hover:hover {
+        transform: none !important;
+    }
+}
