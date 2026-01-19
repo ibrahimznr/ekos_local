@@ -10,6 +10,9 @@ from .iskele import router as iskele_router
 from .static import router as static_router
 from .kalibrasyon import router as kalibrasyon_router
 from .ayarlar import router as ayarlar_router
+from .makineler import router as makineler_router
+from .operatorler import router as operatorler_router
+from .cephe_iskeleleri import router as cephe_iskeleleri_router
 
 __all__ = [
     'auth_router',
@@ -23,5 +26,8 @@ __all__ = [
     'iskele_router',
     'static_router',
     'kalibrasyon_router',
-    'ayarlar_router'
+    'ayarlar_router',
+    'makineler_router',
+    'operatorler_router',
+    'cephe_iskeleleri_router'
 ]

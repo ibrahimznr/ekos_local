@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, FileText, Shield, LogOut, Menu, X, Building2, User, Plus, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
+import { LayoutDashboard, FileText, Shield, LogOut, Menu, X, Building2, User, Plus, ChevronLeft, ChevronRight, Settings, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/utils/api';
 
@@ -39,6 +39,16 @@ const Layout = ({ children }) => {
   // İskele Bileşenleri - admin and inspector
   if (user.role === 'admin' || user.role === 'inspector') {
     navItems.push({ path: '/iskele-bilesenleri', label: 'İskele Bileşenleri', shortLabel: 'İskele', icon: Building2 });
+  }
+
+  // Makineler - admin and inspector
+  if (user.role === 'admin' || user.role === 'inspector') {
+    navItems.push({ path: '/makineler', label: 'Makineler', shortLabel: 'Makineler', icon: Truck });
+  }
+
+  // Cephe İskeleleri - admin and inspector
+  if (user.role === 'admin' || user.role === 'inspector') {
+    navItems.push({ path: '/cephe-iskeleleri', label: 'Cephe İskeleleri', shortLabel: 'Cephe', icon: Building2 });
   }
 
   // Admin panel only for admin

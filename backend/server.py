@@ -37,7 +37,10 @@ from routers import (
     iskele_router,
     static_router,
     kalibrasyon_router,
-    ayarlar_router
+    ayarlar_router,
+    makineler_router,
+    operatorler_router,
+    cephe_iskeleleri_router
 )
 
 ROOT_DIR = Path(__file__).parent
@@ -73,6 +76,9 @@ api_router.include_router(projeler_router)
 api_router.include_router(kalibrasyon_router)
 api_router.include_router(iskele_router)
 api_router.include_router(static_router)
+api_router.include_router(makineler_router)
+api_router.include_router(operatorler_router)
+api_router.include_router(cephe_iskeleleri_router)
 
 # Include the main API router
 app.include_router(api_router)
